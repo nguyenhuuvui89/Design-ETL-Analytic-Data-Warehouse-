@@ -103,9 +103,7 @@ Create table booking_fact_hold_back_data (
 			available_id int,
 			host_id	int	)
 
-insert into booking_fact_hold_back_data (listing_id_p, time_id,	country, city,neighborhood,	available_id,host_id)			
-select listing_id_p, time_id,country, city,neighborhood,available_id,host_id 
-from booking_fact_preparation where listing_id_p = 2818 and time_id > 20191200;
+select * from property_available
 
 select * from booking_fact_hold_back_data
 
@@ -192,13 +190,17 @@ select booking_monthly_revenue_data.listing_id, booking_monthly_revenue_data.ava
 		booking_monthly_revenue_data.month_id, booking_monthly_revenue_data.total_revenue
 from booking_monthly_revenue_data;
 
+
+select * from booking_rev_fact;
 ----------Check result---
 select b.*, month_dim.date_month,month_dim.date_year, list.*, month_dim.* 
 from booking_rev_fact b
 join month_dim on b.month_id = month_dim.month_id
 join listing_dim_new list on list.listing_dim_id = b.listing_id where b.listing_id = 1
 
------- Doing SCD 2 Maintaince
+------Doing SCD 1 Maintenance
+select * from host_dim
+------ Doing SCD 2 Maintenance
 
 
 ---- Have new record of listing_id 2818 changes accommodates from 2 to 4----
@@ -221,7 +223,7 @@ from listing_delta_scd2 li
 																	 or lis.amenities != li_di.amenities
 																	 or lis.description != li_di.description)
  where li_di.current_flag = 'Current')
-
+-----
 select * from delta_union
 
 -------Using Merge to handle SCD2
@@ -254,6 +256,8 @@ join location_dim ldi on ldi.country = bb.country
 						and ldi.city = bb.city
 						and ldi.neighborhood = bb.neighborhood
 where listing_dim_new.listing_id = 2818 and listing_dim_new.current_flag ='Current'
+----------------
+select * from booking_fact_data_after_scd2
 
 ------Insert hold back data after scd2 into booking_fact
 
@@ -262,24 +266,51 @@ select scd2.host_id, scd2.listing_dim_id, scd2.available_id,scd2.location_id,scd
 from booking_fact_data_after_scd2 scd2
 
 ----Verify new records added into booking_fact with new booking_id and cordinate with new listing_dim_id
-select b.booking_id, b.listing_id as listing_dim_id_fk , ln.listing_dim_id,  b.time_id, t.date, ln.current_flag
+select b.booking_id, b.listing_id as listing_dim_id_fk , ln.listing_dim_id, ln.listing_id, b.time_id, t.date, 
+ln.effective_timestamp, ln.expire_timestamp, ln.current_flag
 from booking_fact b
 join time_dim t on t.time_id = b.time_id
 join listing_dim_new ln on ln.listing_dim_id = b.listing_id
 where ln.listing_id = 2818
 order by b.time_id desc
 
-----
+
+-----Answer Bussiness Question in the project.
+----Answer Bussiness Question 1. What is the most popular property and its revenue in 2022
+
+select list.listing_dim_id, list.name, time_dim.year, sum(booking_fact.sale_total) as revenue,
+rank() over ( order by sum(booking_fact.sale_total) desc) as Rev_Ranking
+from listing_dim_new list
+join booking_fact on list.listing_dim_id = booking_fact.listing_id
+join time_dim on time_dim.time_id = booking_fact.time_id
+join property_available on property_available.available_id = booking_fact.available_id
+where time_dim.year = 2022 and property_available.available = 'f'
+group by list.listing_dim_id, time_dim.year, booking_fact.sale_total
+
+--- Approaching by cummulative fact table
+select booking_rev_fact.listing_id, month_dim.date_year, listing_dim_new.name,
+sum(booking_rev_fact.total_revenue) as total_revenue_year,
+rank() over ( order by sum(booking_rev_fact.total_revenue) desc) as Rev_Ranking
+from booking_rev_fact 
+join month_dim on month_dim.month_id = booking_rev_fact.month_id
+join listing_dim_new on listing_dim_new.listing_dim_id = booking_rev_fact.listing_id
+group by booking_rev_fact.listing_id, listing_dim_new.name, month_dim.date_year 
+having month_dim.date_year = 2022
+
+---Answer bussiness question 2.o	What are the factors that effect to the listing’s price in Amsterdam? Answer by Tableau
+--The information help to answer this question are property type, location, amenities, able to book instantly, host_is_super
+select * from
+(select list.property_type, round(avg(list.price),2), location_dim.neighborhood,
+rank() over (partition by (location_dim.neighborhood) order by avg(list.price) desc) as Rank
+from listing_dim_new list
+join booking_fact on list.listing_dim_id = booking_fact.listing_id
+join host_dim on host_dim.host_id = booking_fact.host_id
+join location_dim on location_dim.location_id = booking_fact.location_id
+where location_dim.city = 'Amsterdam'
+group by list.property_type,location_dim.neighborhood) a
+where a.rank < 3
 
 
-
-
-
-
-
-
-
-
-
+select * from listing_dim_new
 
 
