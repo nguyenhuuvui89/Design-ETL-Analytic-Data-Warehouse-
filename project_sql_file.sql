@@ -222,10 +222,27 @@ where exists (select 1
 
 
 
-------Doing SCD 1 Maintenance
+------Doing SCD 1 Maintenance---Not keep historical records, simply update or add new records
+select * from host_dim
+select * from host_dim_delta
+-----
+Merge into host_dim as ta
+using host_dim_delta as so
+on ta.host_id = so.host_id
 
+When not matched then
+insert (host_id, host_name, host_is_superhost, host_response_time)
+values (so.host_id,so.host_name, so.host_is_superhost, so.host_response_time)
 
+when matched and (ta.host_name != so.host_name
+			   or ta.host_is_superhost != so.host_is_superhost
+			   or ta.host_response_time != so.host_response_time)
+then update set host_name = so.host_name, 
+				host_is_superhost = so.host_is_superhost, 
+				host_response_time = so.host_response_time
 
+----Check after SCD1
+select * from host_dim order by host_id
 
 
 ------ Doing SCD 2 Maintenance
@@ -325,19 +342,9 @@ join listing_dim_new on listing_dim_new.listing_dim_id = booking_rev_fact.listin
 group by booking_rev_fact.listing_id, listing_dim_new.name, month_dim.date_year 
 having month_dim.date_year = 2022
 
----Answer bussiness question 2.o	What are the factors that effect to the listing’s price in Amsterdam? Answer by Tableau
---The information help to answer this question are property type, location, amenities, able to book instantly, host_is_super
-select * from
-(select list.property_type, round(avg(list.price),2), location_dim.neighborhood,
-rank() over (partition by (location_dim.neighborhood) order by avg(list.price) desc) as Rank
-from listing_dim_new list
-join booking_fact on list.listing_dim_id = booking_fact.listing_id
-join host_dim on host_dim.host_id = booking_fact.host_id
-join location_dim on location_dim.location_id = booking_fact.location_id
-where location_dim.city = 'Amsterdam'
-group by list.property_type,location_dim.neighborhood) a
-where a.rank < 3
-
+---Answer bussiness question 2.	What are the factors that effect to the listing’s price in Amsterdam? Answer by Tableau
+---Answer bussiness question 3. What are the factors that effect to the listing’s price in Amsterdam? Answer by Tableau
+---Answer bussiness question 4. How do review scores impact the booking revenues of listing properties?
 
 select * from listing_dim_new
 
