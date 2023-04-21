@@ -102,7 +102,14 @@ Create table booking_fact_hold_back_data (
 			neighborhood varchar,
 			available_id int,
 			host_id	int	)
-
+----- Create time_delta table
+create table time_delta (
+	time_id int primary key,
+	date Date,
+	day int,
+	month varchar,
+	year int)
+----
 select * from property_available
 
 select * from booking_fact_hold_back_data
@@ -198,8 +205,29 @@ from booking_rev_fact b
 join month_dim on b.month_id = month_dim.month_id
 join listing_dim_new list on list.listing_dim_id = b.listing_id where b.listing_id = 1
 
+------Doing SCD 0. SCD 0 don't change any data, just add new records if not exist.
+select *from time_delta 
+
+Merge into time_dim as target
+using time_delta 
+on target.time_id = time_delta.time_id
+When not matched then
+insert (time_id, date, day, month,year)
+values (time_delta.time_id, time_delta.date, time_delta.day, time_delta.month, time_delta.year)
+
+select time_id, date, day, month, year
+from time_dim
+where exists (select 1 
+			  from time_delta where time_dim.time_id = time_delta.time_id)
+
+
+
 ------Doing SCD 1 Maintenance
-select * from host_dim
+
+
+
+
+
 ------ Doing SCD 2 Maintenance
 
 
