@@ -344,8 +344,25 @@ having month_dim.date_year = 2022
 
 ---Answer bussiness question 2.	What are the factors that effect to the listing’s price in Amsterdam? Answer by Tableau
 ---Answer bussiness question 3. What are the factors that effect to the listing’s price in Amsterdam? Answer by Tableau
----Answer bussiness question 4. How do review scores impact the booking revenues of listing properties?
+---Answer bussiness question 4. Which are the top 10 listings with the highest number of excellent reviews for communication, 
+--accuracy, and overall rating, along with their name and prices?
+select * from (
+select l.listing_dim_id, l.name, l.price, 
+count(*) number_excellent_review,
+rank() over ( order by count(*) desc ) as ranking
+from review_fact_new r
+join listing_dim_new l on r.listing_id = l.listing_dim_id
+join reviewer_dim re on r.reviewer_id = re.reviewer_id
+group by l.listing_dim_id, l.name
+having round(avg(r.review_scores_communication)) = 10 and 
+round(avg(r.reviews_scores_accuracy)) = 10 and
+round(avg(r.review_score_rating)) = 100) a
+where a.ranking <= 10
 
-select * from listing_dim_new
+
+--- Answer question 5 Which neighborhoods have the highest occupancy and highest number of reviews in Madrid? -- Answer by Tableau
+
+
+
 
 
