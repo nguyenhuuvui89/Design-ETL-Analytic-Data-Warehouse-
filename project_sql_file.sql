@@ -319,7 +319,23 @@ join listing_dim_new ln on ln.listing_dim_id = b.listing_id
 where ln.listing_id = 2818
 order by b.time_id desc
 
+-------SCD 3 Maintenance----
 
+Merge into location_dim as tg
+using location_delta as s
+on tg.location_id = s.location_id
+
+When matched and tg.neighborhood != s.neighborhood 
+Then Update set neighborhood_prev = tg.neighborhood, neighborhood = s.neighborhood
+
+When not matched then
+insert (location_id, country, city, neighborhood)
+values (s.location_id, s.country, s.city, s.neighborhood)
+
+select * from location_dim order by location_id
+
+	
+	
 -----Answer Bussiness Question in the project.
 ----Answer Bussiness Question 1. What is the most popular property and its revenue in 2022
 
@@ -362,7 +378,18 @@ where a.ranking <= 10
 
 --- Answer question 5 Which neighborhoods have the highest occupancy and highest number of reviews in Madrid? -- Answer by Tableau
 
+/*Answer question 6: What is the percentage of properties that were booked for more than 30 days in each neighborhood in 2019
+Select Top 5 Hottes neighborhood base on booked percentage? */
 
-
-
+SELECT * FROM 
+(SELECT ld.neighborhood, 
+to_char(COUNT(CASE WHEN pa.maximum_nights > 30 THEN bf.booking_id END)::float / COUNT(bf.booking_id) * 100, '99.99%') AS percentage,
+DENSE_RANK() OVER (Order By COUNT(CASE WHEN pa.maximum_nights > 30 THEN bf.booking_id END)::float / COUNT(bf.booking_id) * 100 DESC) as Ranking
+FROM Booking_Fact bf
+JOIN Property_available pa ON bf.available_id = pa.available_id
+JOIN Location_Dim ld ON bf.location_id = ld.location_id
+JOIN Time_dim t on t.time_id = bf.time_id
+WHERE t.year = 2019 
+GROUP BY ld.neighborhood) a
+Where a.Ranking <= 5 
 
